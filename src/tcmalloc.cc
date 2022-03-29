@@ -86,7 +86,7 @@
 // * malloc/free of small objects goes from ~300 ns to ~50 ns.
 // * allocation of a reasonably complicated struct
 //   goes from about 1100 ns to about 300 ns.
-
+#include <iostream>
 #include "config.h"
 // At least for gcc on Linux/i386 and Linux/amd64 not adding throw()
 // to tc_xxx functions actually ends up generating better code.
@@ -147,7 +147,11 @@ using std::min;
 using std::numeric_limits;
 using std::vector;
 
+#ifdef TCMALLOC_DO_NOT_OVERRIDE
+static void ReplaceSystemAlloc(){}
+#else
 #include "libc_override.h"
+#endif
 
 using tcmalloc::AlignmentForSize;
 using tcmalloc::kLog;

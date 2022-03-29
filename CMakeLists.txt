@@ -845,7 +845,7 @@ set_target_properties(tcmalloc_minimal PROPERTIES
 weaken_object(tcmalloc_minimal)
 install(TARGETS tcmalloc_minimal)
 if(GPERFTOOLS_BUILD_STATIC)
-    add_library(tcmalloc_minimal_static STATIC ${libtcmalloc_minimal_internal_la_SOURCES})
+    add_library(tcmalloc_minimal_static STATIC ${libtcmalloc_minimal_la_SOURCES})
     target_compile_definitions(tcmalloc_minimal_static PRIVATE NO_TCMALLOC_SAMPLES NDEBUG)
     target_link_libraries(tcmalloc_minimal_static PRIVATE tcmalloc_minimal_internal Threads::Threads)
     if(MINGW)
@@ -858,6 +858,14 @@ if(GPERFTOOLS_BUILD_STATIC)
     weaken_object(tcmalloc_minimal_static)
     install(TARGETS tcmalloc_minimal_static)
 endif()
+
+add_library(tcmalloc_minimal_non_override STATIC src/file_allocator.cc ${libtcmalloc_minimal_la_SOURCES} ${libtcmalloc_minimal_internal_la_SOURCES})
+target_compile_definitions(tcmalloc_minimal_non_override PRIVATE NO_TCMALLOC_SAMPLES NO_HEAP_CHECK NDEBUG)
+target_compile_definitions(tcmalloc_minimal_non_override PUBLIC TCMALLOC_DO_NOT_OVERRIDE TCMALLOC_FILE_ALLOCATOR)
+
+target_link_libraries(tcmalloc_minimal_non_override PRIVATE Threads::Threads)
+
+weaken_object(tcmalloc_minimal_non_override)
 
 if(BUILD_TESTING)
   set(tcmalloc_minimal_unittest_SOURCES

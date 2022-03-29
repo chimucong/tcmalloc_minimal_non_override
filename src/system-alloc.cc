@@ -30,7 +30,7 @@
 
 // ---
 // Author: Sanjay Ghemawat
-
+#include <iostream>
 #include <config.h>
 #include <errno.h>                      // for EAGAIN, errno
 #include <fcntl.h>                      // for open, O_RDWR
@@ -55,6 +55,10 @@
 #include "base/spinlock.h"              // for SpinLockHolder, SpinLock, etc
 #include "common.h"
 #include "internal_logging.h"
+
+#ifdef TCMALLOC_FILE_ALLOCATOR
+#include "file_allocator.h"
+#endif
 
 // On systems (like freebsd) that don't define MAP_ANONYMOUS, use the old
 // form of the name instead.
@@ -142,6 +146,14 @@ DEFINE_bool(malloc_disable_memory_release,
             " to return unused memory to the system.");
 
 // static allocators
+
+#ifdef TCMALLOC_FILE_ALLOCATOR
+static union {
+  char buf[sizeof(FileAllocator)];
+  void *ptr;
+} file_space;
+#endif
+
 class SbrkSysAllocator : public SysAllocator {
 public:
   SbrkSysAllocator() : SysAllocator() {
@@ -191,7 +203,11 @@ class DefaultSysAllocator : public SysAllocator {
   void* Alloc(size_t size, size_t *actual_size, size_t alignment);
 
  private:
+#ifdef TCMALLOC_FILE_ALLOCATOR
+  static const int kMaxAllocators = 3;
+#else
   static const int kMaxAllocators = 2;
+#endif
   bool failed_[kMaxAllocators];
   SysAllocator* allocs_[kMaxAllocators];
   const char* names_[kMaxAllocators];
@@ -470,12 +486,18 @@ void InitSystemAllocators(void) {
   // the heap-checker is less likely to misinterpret a number as a
   // pointer).
   DefaultSysAllocator *sdef = new (default_space.buf) DefaultSysAllocator();
+  int i = 0;
+#ifdef TCMALLOC_FILE_ALLOCATOR
+  init_file_allocator_module();
+  FileAllocator *file = new (file_space.buf) FileAllocator();
+  sdef->SetChildAllocator(file, i++, "FileAllocator");
+#endif
   if (kDebugMode && sizeof(void*) > 4) {
-    sdef->SetChildAllocator(mmap, 0, mmap_name);
-    sdef->SetChildAllocator(sbrk, 1, sbrk_name);
+    sdef->SetChildAllocator(mmap, i++, mmap_name);
+    sdef->SetChildAllocator(sbrk, i++, sbrk_name);
   } else {
-    sdef->SetChildAllocator(sbrk, 0, sbrk_name);
-    sdef->SetChildAllocator(mmap, 1, mmap_name);
+    sdef->SetChildAllocator(sbrk, i++, sbrk_name);
+    sdef->SetChildAllocator(mmap, i++, mmap_name);
   }
 
   tcmalloc_sys_alloc = tc_get_sysalloc_override(sdef);
